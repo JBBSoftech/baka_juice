@@ -4,37 +4,12 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:appifyours/config/environment.dart';
-import 'package:carousel_slider/carousel_slider.dart';
-import 'package:appifyours/services/api_service.dart';
+import 'package:frontend/config/environment.dart';
 
 // Define PriceUtils class
 class PriceUtils {
   static String formatPrice(double price, {String currency = '\$'}) {
     return '$currency\${price.toStringAsFixed(2)}';
-  }
-
-  static String currencySymbolFromCode(String code) {
-    switch (code.toUpperCase()) {
-      case 'INR':
-        return '₹';
-      case 'USD':
-        return '\$';
-      case 'EUR':
-        return '€';
-      case 'GBP':
-        return '£';
-      case 'JPY':
-        return '¥';
-      case 'KRW':
-        return '₩';
-      case 'RUB':
-        return '₽';
-      case 'NGN':
-        return '₦';
-      default:
-        return '\$';
-    }
   }
   
   // Extract numeric value from price string with any currency symbol
@@ -84,7 +59,6 @@ class CartItem {
   final double discountPrice;
   int quantity;
   final String? image;
-  final String currencySymbol;
   
   CartItem({
     required this.id,
@@ -93,7 +67,6 @@ class CartItem {
     this.discountPrice = 0.0,
     this.quantity = 1,
     this.image,
-    this.currencySymbol = '\$',
   });
   
   double get effectivePrice => discountPrice > 0 ? discountPrice : price;
@@ -105,20 +78,8 @@ class CartManager extends ChangeNotifier {
   final List<CartItem> _items = [];
   double _gstPercentage = 18.0; // Default GST percentage
   double _discountPercentage = 0.0; // Default discount percentage
-  String _currencySymbol = '\$';
   
   List<CartItem> get items => List.unmodifiable(_items);
-
-  int get totalQuantity {
-    return _items.fold(0, (sum, item) => sum + item.quantity);
-  }
-
-  String get displayCurrencySymbol {
-    if (_items.isNotEmpty) {
-      return _items.first.currencySymbol;
-    }
-    return _currencySymbol;
-  }
   
   // Update GST percentage
   void updateGSTPercentage(double percentage) {
@@ -144,10 +105,6 @@ class CartManager extends ChangeNotifier {
       _items[existingIndex].quantity += item.quantity;
     } else {
       _items.add(item);
-    }
-
-    if (item.currencySymbol.isNotEmpty) {
-      _currencySymbol = item.currencySymbol;
     }
     notifyListeners();
   }
@@ -214,7 +171,7 @@ class WishlistItem {
     required this.price,
     this.discountPrice = 0.0,
     this.image,
-    this.currencySymbol = '\$',
+    this.currencySymbol = '$',
   });
   
   double get effectivePrice => discountPrice > 0 ? discountPrice : price;
@@ -257,13 +214,13 @@ class WishlistManager extends ChangeNotifier {
 }
 
 // Dynamic Configuration from Form
-final String gstNumber = '';
-final String selectedCategory = '';
+final String gstNumber = '$gstNumber';
+final String selectedCategory = '$selectedCategory';
 final Map<String, dynamic> storeInfo = {
-  'storeName': 'My Store',
-  'address': '123 Main St',
-  'email': 'support@example.com',
-  'phone': '(123) 456-7890',
+  'storeName': '${storeInfo['storeName'] ?? 'My Store'}',
+  'address': '${storeInfo['address'] ?? '123 Main St'}',
+  'email': '${storeInfo['email'] ?? 'support@example.com'}',
+  'phone': '${storeInfo['phone'] ?? '(123) 456-7890'}',
 };
 
 // Dynamic Product Data - Will be loaded from backend
@@ -367,7 +324,7 @@ class DynamicAppSync {
 // Function to load dynamic product data from backend
 Future<void> loadDynamicProductData() async {
   try {
-    safeSetState(() {
+    setState(() {
       isLoading = true;
       errorMessage = null;
     });
@@ -399,7 +356,7 @@ Future<void> loadDynamicProductData() async {
           }
         }
         
-        safeSetState(() {
+        setState(() {
           productCards = newProducts;
           isLoading = false;
         });
@@ -413,7 +370,7 @@ Future<void> loadDynamicProductData() async {
     }
   } catch (e) {
     print('❌ Error loading dynamic data: $e');
-    safeSetState(() {
+    setState(() {
       errorMessage = e.toString();
       isLoading = false;
     });
@@ -430,7 +387,7 @@ void startRealTimeUpdates() async {
     _appSync.connect(adminId: adminId, apiBase: Environment.apiBase);
     
     _updateSubscription = _appSync.updates.listen((update) {
-      if (!_globalMounted) return;
+      if (!mounted) return;
       
       final type = update['type']?.toString().toLowerCase();
       print('📱 Received real-time update: $type');
@@ -445,10 +402,18 @@ void startRealTimeUpdates() async {
   }
 }
 
-bool _globalMounted = true;
+@override
+void initState() {
+  super.initState();
+  loadDynamicProductData();
+  startRealTimeUpdates();
+}
 
-void safeSetState(void Function() fn) {
-  fn();
+@override
+void dispose() {
+  _updateSubscription?.cancel();
+  _appSync.dispose();
+  super.dispose();
 }
 
 
@@ -469,6 +434,13 @@ class MyApp extends StatelessWidget {
         shadowColor: Colors.black38,
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+      ),
+      cardTheme: const CardThemeData(
+        elevation: 4,
+        shadowColor: Colors.black12,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -497,12 +469,6 @@ class ApiConfig {
   static String get baseUrl => Environment.apiBase;
   static const String adminObjectId = '695392d4c369cd49b17c540d'; // Will be replaced during publish
   static const String appId = 'APP_ID_HERE'; // Will be replaced during publish
-}
-
-class AuthHelper {
-  static Future<bool> isAdmin() async {
-    return false;
-  }
 }
 
 class SessionManager {
@@ -596,18 +562,11 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   String _appName = 'Loading...';
-  Timer? _navigateTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchAppNameAndNavigate();
-  }
-
-  @override
-  void dispose() {
-    _navigateTimer?.cancel();
-    super.dispose();
   }
 
   Future<void> _fetchAppNameAndNavigate() async {
@@ -648,15 +607,15 @@ class _SplashScreenState extends State<SplashScreen> {
         });
       }
     }
-
-    _navigateTimer?.cancel();
-    _navigateTimer = Timer(const Duration(seconds: 3), () {
-      if (!mounted) return;
+    
+    await Future.delayed(const Duration(seconds: 3));
+    
+    if (mounted) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const SignInPage()),
       );
-    });
+    }
   }
 
   @override
@@ -1121,6 +1080,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
             ],
           ),
         ),
+      ),
     );
   }
 }
@@ -1250,12 +1210,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onPageChanged(int index) => setState(() => _currentPageIndex = index);
-
-  void _handleBuyNow() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Buy Now clicked')),
-    );
-  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -2931,3 +2885,38 @@ class _HomePageState extends State<HomePage> {
   }
 
 }
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      currentIndex: _currentPageIndex,
+      onTap: _onItemTapped,
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: Colors.blue,
+      unselectedItemColor: Colors.grey,
+      items: [
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Badge(
+            label: Text('${_wishlistManager.items.length}'),
+            isLabelVisible: _wishlistManager.items.length > 0,
+            child: const Icon(Icons.favorite),
+          ),
+          label: 'Wishlist',
+        ),
+        BottomNavigationBarItem(
+          icon: Badge(
+            label: Text('${_cartManager.items.length}'),
+            isLabelVisible: _cartManager.items.length > 0,
+            child: const Icon(Icons.shopping_cart),
+          ),
+          label: 'Cart',
+        ),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: 'Profile',
+        ),
+      ],
+    );
+  }
